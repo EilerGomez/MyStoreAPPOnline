@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { BrowserMultiFormatReader, NotFoundException } from "@zxing/browser";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 /**
  * Escáner de cámara con ZXing:
@@ -18,10 +18,9 @@ export default function ScannerZXing({ onResult, onClose }) {
     const reader = new BrowserMultiFormatReader();
     readerRef.current = reader;
 
-    // Empieza a decodificar desde la cámara
     reader
       .decodeFromVideoDevice(
-        null, // cámara por defecto (usará la trasera si existe)
+        null,
         videoRef.current,
         (result, err) => {
           if (stoppedRef.current) return;
@@ -33,20 +32,19 @@ export default function ScannerZXing({ onResult, onClose }) {
             onResult?.(text);
             onClose?.();
           }
-          // err puede ser NotFoundException en frames sin código; lo ignoramos
-          if (err && !(err instanceof NotFoundException)) {
+
+          // En frames sin código ZXing lanza NotFoundException desde @zxing/library
+          // No necesitamos importarla: basta con ignorar esos errores.
+          if (err && err.name !== "NotFoundException") {
             console.debug("ZXing error:", err?.message || err);
           }
         },
         {
-          video: {
-            facingMode: { ideal: "environment" }, // cámara trasera
-          },
+          video: { facingMode: { ideal: "environment" } }, // cámara trasera
         }
       )
       .catch((e) => console.error("ZXing init error:", e));
 
-    // Limpieza
     return () => {
       stoppedRef.current = true;
       try { reader.reset(); } catch {}

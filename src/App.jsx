@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import ScannerZXing from "./components/ScannerZXing"; // ⬅️ nuevo
 
 /* ========= utilidades ========= */
 const money = (n) =>
@@ -251,17 +251,7 @@ function ClienteForm({ initial, onSubmit }) {
   );
 }
 
-/* ========= Escáner ========= */
-function Scanner({ onResult }) {
-  useEffect(() => {
-    const id = "reader";
-    const s = new Html5QrcodeScanner(id, { fps: 10, qrbox: 250 }, false);
-    s.render((t) => { onResult(t); s.clear(); }, () => {});
-    return () => { try { s.clear(); } catch {} };
-  }, [onResult]);
-  return <div id="reader" className="w-full aspect-video border rounded" />;
-}
-
+/* ========= Vender (con ZXing) ========= */
 function VenderTab({ productos, clientes, onRegistrarVenta }) {
   const [productIdOrCode, setProductIdOrCode] = useState("");
   const [qty, setQty] = useState(1);
@@ -314,11 +304,11 @@ function VenderTab({ productos, clientes, onRegistrarVenta }) {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       <Section title="Nueva venta">
-        {/* ⬇️ Campo arriba y controles abajo */}
+        {/* input arriba */}
         <div className="space-y-2 mb-3">
           <input
             className="input w-full"
-            placeholder="ID de producto o Código de barras"
+            placeholder="ID de producto o Código de barras / QR"
             value={productIdOrCode}
             onChange={(e) => setProductIdOrCode(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
@@ -373,7 +363,7 @@ function VenderTab({ productos, clientes, onRegistrarVenta }) {
                 </tr>
               ))}
               {!cart.length && (
-                <tr><td className="td text-center muted py-8" colSpan={5}>Agrega productos por ID o escaneo</td></tr>
+                <tr><td className="td text-center muted py-8" colSpan={5}>Agrega productos por ID, código o escaneo</td></tr>
               )}
             </tbody>
           </table>
@@ -410,12 +400,18 @@ function VenderTab({ productos, clientes, onRegistrarVenta }) {
       </Section>
 
       <Modal open={scannerOpen} onClose={() => setScannerOpen(false)} title="Escanear código">
-        <Scanner onResult={(code) => { setProductIdOrCode(String(code)); setScannerOpen(false); }} />
+        <ScannerZXing
+          onResult={(code) => {
+            setProductIdOrCode(String(code));
+            // Si quieres agregar automáticamente al leer:
+            // setQty(1); handleAdd();
+          }}
+          onClose={() => setScannerOpen(false)}
+        />
       </Modal>
     </div>
   );
 }
-
 
 /* ========= Ventas ========= */
 function VentasTab({ ventas, clientes, productos }) {

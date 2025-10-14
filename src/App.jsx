@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
-import ScannerZXing from "./components/ScannerZXing";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import ScannerZXing from "./components/ScannerZXing";
+
 /** API base desde .env (sin slash al final) */
 const API_BASE =
   (import.meta.env.VITE_API_URL?.replace(/\/$/, "") ||
@@ -237,7 +238,7 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-2xl rounded-xl shadow-xl">
+      <div className="bg-white w/full max-w-2xl rounded-xl shadow-xl">
         <div className="flex items-center justify-between border-b px-5 py-3">
           <h3 className="font-semibold">{title}</h3>
           <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800">✕</button>
@@ -734,7 +735,6 @@ function VenderTab({ productos, clientes, empresa, onRegistrarVenta }) {
         )}
       </Section>
 
-
       <Modal open={scannerOpen} onClose={() => setScannerOpen(false)} title="Escanear código">
         <ScannerZXing
           onResult={(code) => { setProductIdOrCode(String(code)); inputRef.current?.focus(); }}
@@ -745,11 +745,20 @@ function VenderTab({ productos, clientes, empresa, onRegistrarVenta }) {
   );
 }
 
-
+/* ======================= FECHAS (zona America/Guatemala) ======================= */
 const formatFechaLocal = (fechaStr) => {
   if (!fechaStr) return "";
+
+  // Si viene en formato ISO sin hora útil
+  if (/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(fechaStr)) {
+    const [y, m, d] = fechaStr.split("T")[0].split("-");
+    return `${d}/${m}/${y}`; // Ej: 14/10/2025
+  }
+
   const fecha = new Date(fechaStr);
   if (isNaN(fecha)) return String(fechaStr);
+
+  // Formato completo con hora local
   return fecha.toLocaleString("es-GT", {
     timeZone: "America/Guatemala",
     year: "numeric",
@@ -760,8 +769,32 @@ const formatFechaLocal = (fechaStr) => {
   });
 };
 
+// Clave YYYY-MM-DD en zona GT (ideal para comparar y filtrar rango/hoy)
+// Clave de fecha en zona America/Guatemala (YYYY-MM-DD)
+const toGTDateKey = (d) => {
+  if (!d) return "";
+
+  // Si viene exactamente como "YYYY-MM-DDT00:00:00.000Z", usa la parte de fecha tal cual.
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(d)) {
+    return d.slice(0, 10); // "YYYY-MM-DD"
+  }
+
+  const date = new Date(d);
+  if (isNaN(date)) return String(d);
+
+  // Formatear a zona America/Guatemala y aaaaa-mm-dd
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Guatemala",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return fmt.format(date); // "YYYY-MM-DD"
+};
 
 
+/* ======================= Ventas ======================= */
 function VentasTab({ ventas, clientes, productos }) {
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [detalleVenta, setDetalleVenta] = useState(null);
@@ -773,35 +806,24 @@ function VentasTab({ ventas, clientes, productos }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
 
-  const normalizarFecha = (d) => {
-    const date = new Date(d);
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  };
-  const esMismoDia = (a, b) => normalizarFecha(a).getTime() === normalizarFecha(b).getTime();
-
   const ventasFiltradas = useMemo(() => {
     let arr = Array.isArray(ventas) ? ventas.slice() : [];
-    // Filtro por modo de fecha
+
+    // Filtro por modo de fecha (en zona GT)
     if (modo === "hoy") {
-      const hoy = new Date();
-      arr = arr.filter((v) => {
-        const f = new Date(v.fechaISO || v.fecha || new Date());
-        return esMismoDia(f, hoy);
-      });
+      const hoyKey = toGTDateKey(new Date());
+      arr = arr.filter((v) => toGTDateKey(v.fecha || v.fechaISO || new Date()) === hoyKey);
     } else if (modo === "rango" && (desde || hasta)) {
-      const d1 = desde ? normalizarFecha(desde) : null;
-      const d2 = hasta ? normalizarFecha(hasta) : null;
+      const d1 = desde ? desde : null; // YYYY-MM-DD
+      const d2 = hasta ? hasta : null; // YYYY-MM-DD
       arr = arr.filter((v) => {
-        const f = normalizarFecha(v.fechaISO || v.fecha || new Date());
-        if (d1 && f < d1) return false;
-        if (d2 && f > d2) return false;
+        const key = toGTDateKey(v.fecha || v.fechaISO || new Date());
+        if (d1 && key < d1) return false;
+        if (d2 && key > d2) return false;
         return true;
       });
     }
-    if (modo !== "rango") {
-      setDesde("");
-      setHasta("");
-    }
+
     // Buscador
     const QQ = q.trim().toLowerCase();
     if (QQ) {
@@ -812,7 +834,7 @@ function VentasTab({ ventas, clientes, productos }) {
           v.vendedor || "",
           c ? `${c.nombre} ${c.apellido}` : "",
           c?.cedula || "",
-          new Date(v.fechaISO || v.fecha || new Date()).toLocaleString(),
+          formatFechaLocal(v.fecha || v.fechaISO),
           String(v.total),
         ].join(" ").toLowerCase();
         return campos.includes(QQ);
@@ -854,7 +876,7 @@ function VentasTab({ ventas, clientes, productos }) {
       const c = v.cliente || (clientes || []).find((x) => x.id === v.clienteId);
       return [
         v.id,
-        new Date(v.fechaISO || v.fecha || new Date()).toLocaleString(),
+        formatFechaLocal(v.fecha || v.fechaISO),
         c ? `${c.nombre} ${c.apellido}` : "",
         c?.cedula || "",
         v.vendedor,
@@ -866,7 +888,7 @@ function VentasTab({ ventas, clientes, productos }) {
       body,
       startY: 30,
     });
-    doc.save(`reporte_ventas_${new Date().toISOString().split("T")[0]}.pdf`);
+    doc.save(`reporte_ventas_${toGTDateKey(new Date())}.pdf`);
   };
 
   /* ============ EXPORTAR EXCEL ============ */
@@ -876,7 +898,7 @@ function VentasTab({ ventas, clientes, productos }) {
       const c = v.cliente || (clientes || []).find((x) => x.id === v.clienteId);
       return {
         ID: v.id,
-        Fecha: new Date(v.fechaISO || v.fecha || new Date()).toLocaleString(),
+        Fecha: formatFechaLocal(v.fecha || v.fechaISO),
         Cliente: c ? `${c.nombre} ${c.apellido}` : "",
         NIT: c?.cedula || "",
         Vendedor: v.vendedor,
@@ -886,7 +908,7 @@ function VentasTab({ ventas, clientes, productos }) {
     const ws = XLSX.utils.json_to_sheet(datos);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ventas");
-    XLSX.writeFile(wb, `reporte_ventas_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `reporte_ventas_${toGTDateKey(new Date())}.xlsx`);
   };
 
   return (
@@ -945,10 +967,10 @@ function VentasTab({ ventas, clientes, productos }) {
           {/* Exportar */}
           <div className="flex gap-2">
             <button type="button" className="btn-outline" onClick={exportarPDF}>
-               PDF
+              PDF
             </button>
             <button type="button" className="btn-outline" onClick={exportarExcel}>
-               Excel
+              Excel
             </button>
           </div>
         </div>
@@ -973,7 +995,7 @@ function VentasTab({ ventas, clientes, productos }) {
               return (
                 <tr key={v.id} className="tr-hover border-t">
                   <td className="td">{v.id}</td>
-                  <td className="td">{new Date(v.fechaISO || v.fecha || new Date()).toLocaleString()}</td>
+                  <td className="td">{formatFechaLocal(v.fecha || v.fechaISO)}</td>
                   <td className="td">{c ? `${c.nombre} ${c.apellido}` : ""}</td>
                   <td className="td">{v.vendedor}</td>
                   <td className="td text-right">{money(v.total)}</td>
@@ -998,7 +1020,7 @@ function VentasTab({ ventas, clientes, productos }) {
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
                 <div className="muted">Fecha</div>
-                <div>{new Date(detalleVenta.fechaISO || detalleVenta.fecha || new Date()).toLocaleString()}</div>
+                <div>{formatFechaLocal(detalleVenta.fecha || detalleVenta.fechaISO)}</div>
               </div>
               <div>
                 <div className="muted">Vendedor</div>
@@ -1113,7 +1135,7 @@ async function generarFacturaPDF({ venta, empresa }) {
   doc.setFont(undefined, "bold"); doc.text("FACTURA", xRight, y, { align: "right" });
   doc.setFont(undefined, "normal");
   y += 14; doc.text(`No.: ${venta.id ?? ""}`, xRight, y, { align: "right" });
-  y += 14; doc.text(`Fecha: ${new Date(venta.fechaISO || venta.fecha || new Date()).toLocaleString()}`, xRight, y, { align: "right" });
+  y += 14; doc.text(`Fecha: ${formatFechaLocal(venta.fechaISO || venta.fecha || new Date())}`, xRight, y, { align: "right" });
   y += 14; doc.text(`Vendedor: ${venta.vendedor}`, xRight, y, { align: "right" });
 
   // Cliente (prioriza venta.cliente)

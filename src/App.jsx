@@ -1,22 +1,48 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
-import ScannerZXing from "./components/ScannerZXing"; // ⬅️ nuevo
+import ScannerZXing from "./components/ScannerZXing";
 
-/* ========= utilidades ========= */
-const money = (n) =>
-  new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(
-    Number(n || 0)
-  );
-const todayISO = () => new Date().toISOString();
-const nextId = (arr) => (arr.length ? Math.max(...arr.map((x) => x.id || 0)) + 1 : 1);
-
-/* ========= datos iniciales ========= */
-const seedEmpresa = {
-  id: 1,
-  nombre: "Mi Empresa",
-  ubicacion: "Ciudad, Guatemala",
-  telefono: "5555-0000",
+/* ========= Config & helpers ========= */
+const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "https://mystoreappbackonline.onrender.com/api";
+const json = (r) => {
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
 };
+const api = {
+  // Productos
+  getProductos: () => fetch(`${API_BASE}/productos`).then(json),
+  getProductoPorCodigo: (codigo) => fetch(`${API_BASE}/productos/codigo/${encodeURIComponent(codigo)}`).then(json),
+  postProducto: (data) =>
+    fetch(`${API_BASE}/productos`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(json),
+  putProducto: (id, data) =>
+    fetch(`${API_BASE}/productos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(json),
+  delProducto: (id) => fetch(`${API_BASE}/productos/${id}`, { method: "DELETE" }).then(json),
+
+  // Clientes
+  getClientes: () => fetch(`${API_BASE}/clientes`).then(json),
+  postCliente: (data) =>
+    fetch(`${API_BASE}/clientes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(json),
+  putCliente: (id, data) =>
+    fetch(`${API_BASE}/clientes/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(json),
+  delCliente: (id) => fetch(`${API_BASE}/clientes/${id}`, { method: "DELETE" }).then(json),
+
+  // Ventas
+  getVentas: () => fetch(`${API_BASE}/ventas`).then(json),
+  postVenta: (data) =>
+    fetch(`${API_BASE}/ventas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(json),
+
+  // Empresa
+  getEmpresa: () => fetch(`${API_BASE}/empresa`).then(json),
+  putEmpresa: (data) =>
+    fetch(`${API_BASE}/empresa/1`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).then(json),
+};
+
+const money = (n) =>
+  new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(Number(n || 0));
+const todayISO = () => new Date().toISOString();
+
+/* ========= seeds de fallback (sólo si API falla) ========= */
+const seedEmpresa = { id: 1, nombre: "Mi Empresa", ubicacion: "Ciudad, Guatemala", telefono: "5555-0000" };
 const seedClientes = [
   { id: 1, cedula: "", nombre: "C/F", apellido: "", telefono: "", direccion: "" },
   { id: 2, cedula: "1234567-8", nombre: "Ana", apellido: "Pérez", telefono: "5555-0001", direccion: "Zona 1" },
@@ -25,108 +51,170 @@ const seedProductos = [
   { id: 1, nombre: "Lector de codigo de barras", codigo: "810098151139", stock: 100, precio: 200 },
   { id: 2, nombre: "Libro muchos cuerpos una misma alma", codigo: "9788496546080", stock: 60, precio: 150 },
 ];
-const seedVentas = [
-  {
-    id: 1,
-    clienteId: 1, // C/F
-    vendedor: "Kenny",
-    fechaISO: "2025-10-10T09:32:00Z",
-    total: 63.0,
-    items: [
-      { productId: 1, cantidad: 3, precio: 4.5 },
-      { productId: 2, cantidad: 3, precio: 18.0 },
-    ],
-  },
-  {
-    id: 2,
-    clienteId: 2, // Ana Pérez
-    vendedor: "Mario",
-    fechaISO: "2025-10-11T15:45:00Z",
-    total: 22.5,
-    items: [
-      { productId: 1, cantidad: 5, precio: 4.5 },
-    ],
-  },
-  {
-    id: 3,
-    clienteId: 2,
-    vendedor: "Eiler",
-    fechaISO: "2025-10-12T11:15:00Z",
-    total: 36.0,
-    items: [
-      { productId: 2, cantidad: 2, precio: 18.0 },
-    ],
-  },
-];
 
-const STORAGE_PREFIX = 'ventas-sim';
-const STORAGE_VERSION = 'v2'; // súbelo cuando cambies seeds
-
-function ensureSeedsVersion() {
-  const metaKey = `${STORAGE_PREFIX}:meta`;
-  const meta = JSON.parse(localStorage.getItem(metaKey) || 'null');
-
-  if (!meta || meta.version !== STORAGE_VERSION) {
-    localStorage.setItem(`${STORAGE_PREFIX}:empresa`, JSON.stringify(seedEmpresa));
-    localStorage.setItem(`${STORAGE_PREFIX}:clientes`, JSON.stringify(seedClientes));
-    localStorage.setItem(`${STORAGE_PREFIX}:productos`, JSON.stringify(seedProductos));
-    localStorage.setItem(`${STORAGE_PREFIX}:ventas`,   JSON.stringify(seedVentas));
-    localStorage.setItem(metaKey, JSON.stringify({ version: STORAGE_VERSION, seededAt: new Date().toISOString() }));
-  }
-}
-/* ========= almacenamiento local ========= */
-ensureSeedsVersion();
+/* ========= store (con API) ========= */
 function useStore() {
-  const [empresa, setEmpresa] = useState(() => loadLS("empresa", seedEmpresa));
-  const [clientes, setClientes] = useState(() => loadLS("clientes", seedClientes));
-  const [productos, setProductos] = useState(() => loadLS("productos", seedProductos));
-  const [ventas, setVentas] = useState(() => loadLS("ventas", seedVentas));
+  const [empresa, setEmpresa] = useState(seedEmpresa);
+  const [clientes, setClientes] = useState(seedClientes);
+  const [productos, setProductos] = useState(seedProductos);
+  const [ventas, setVentas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => saveLS("empresa", empresa), [empresa]);
-  useEffect(() => saveLS("clientes", clientes), [clientes]);
-  useEffect(() => saveLS("productos", productos), [productos]);
-  useEffect(() => saveLS("ventas", ventas), [ventas]);
+  const cargarTodo = async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      const [e, c, p, v] = await Promise.all([
+        api.getEmpresa(),
+        api.getClientes(),
+        api.getProductos(),
+        api.getVentas(),
+      ]);
+      // Normaliza empresa: si API devuelve arreglo, toma el primero
+      setEmpresa(Array.isArray(e) ? (e[0] || seedEmpresa) : e);
+      setClientes(c || []);
+      setProductos(p || []);
+      setVentas(v || []);
+    } catch (err) {
+      console.warn("Fallo al cargar API. Usando seeds de fallback.", err);
+      setError("No se pudo conectar a la API. Trabajando con datos locales temporales.");
+      // seeds ya quedaron cargados por defecto
+    } finally {
+      setCargando(false);
+    }
+  };
 
-  const addProducto = (p) => setProductos((arr) => [...arr, { ...p, id: nextId(arr) }]);
-  const updateProducto = (p) => setProductos((arr) => arr.map((x) => (x.id === p.id ? { ...x, ...p } : x)));
-  const deleteProducto = (id) => setProductos((arr) => arr.filter((x) => x.id !== id));
+  useEffect(() => {
+    cargarTodo();
+  }, []);
 
-  const addCliente = (c) => setClientes((arr) => [...arr, { ...c, id: nextId(arr) }]);
-  const updateCliente = (c) => setClientes((arr) => arr.map((x) => (x.id === c.id ? { ...x, ...c } : x)));
-  const deleteCliente = (id) => setClientes((arr) => arr.filter((x) => x.id !== id));
+  // Productos
+  const addProducto = async (prod) => {
+    try {
+      const nuevo = await api.postProducto(prod);
+      setProductos((arr) => [...arr, nuevo]);
+    } catch (err) {
+      alert("No se pudo crear el producto");
+      console.error(err);
+    }
+  };
+  const updateProducto = async (prod) => {
+    try {
+      const actualizado = await api.putProducto(prod.id, prod);
+      setProductos((arr) => arr.map((x) => (x.id === prod.id ? actualizado : x)));
+    } catch (err) {
+      alert("No se pudo actualizar el producto");
+      console.error(err);
+    }
+  };
+  const deleteProducto = async (id) => {
+    if (!confirm("¿Eliminar producto?")) return;
+    try {
+      await api.delProducto(id);
+      setProductos((arr) => arr.filter((x) => x.id !== id));
+    } catch (err) {
+      alert("No se pudo eliminar el producto");
+      console.error(err);
+    }
+  };
 
-  const registrarVenta = (venta) => {
-    setVentas((arr) => [...arr, { ...venta, id: nextId(arr) }]);
-    setProductos((arr) =>
-      arr.map((p) => {
-        const it = venta.items.find((i) => i.productId === p.id);
-        return it ? { ...p, stock: Math.max(0, p.stock - it.cantidad) } : p;
-      })
-    );
+  // Clientes
+  const addCliente = async (cli) => {
+    try {
+      const nuevo = await api.postCliente(cli);
+      setClientes((arr) => [...arr, nuevo]);
+    } catch (err) {
+      alert("No se pudo crear el cliente");
+      console.error(err);
+    }
+  };
+  const updateCliente = async (cli) => {
+    try {
+      const actualizado = await api.putCliente(cli.id, cli);
+      setClientes((arr) => arr.map((x) => (x.id === cli.id ? actualizado : x)));
+    } catch (err) {
+      alert("No se pudo actualizar el cliente");
+      console.error(err);
+    }
+  };
+  const deleteCliente = async (id) => {
+    if (id === 1) return alert("No se puede eliminar el cliente C/F");
+    if (!confirm("¿Eliminar cliente?")) return;
+    try {
+      await api.delCliente(id);
+      setClientes((arr) => arr.filter((x) => x.id !== id));
+    } catch (err) {
+      alert("No se pudo eliminar el cliente");
+      console.error(err);
+    }
+  };
+
+  // Ventas
+  const registrarVenta = async (venta) => {
+    try {
+      // El backend se encarga de descontar stocks y guardar detalle
+      const creada = await api.postVenta({
+        clienteId: venta.clienteId,
+        vendedor: venta.vendedor,
+        total: venta.total,
+        fecha: new Date(venta.fechaISO).toISOString().slice(0, 10),
+        items: venta.items.map((it) => ({
+          productoId: it.productId,
+          cantidad: it.cantidad,
+          precio: it.precio,
+        })),
+      });
+      setVentas((arr) => [...arr, creada]);
+
+      // Como el stock cambia, recargamos productos desde la API:
+      try {
+        const p = await api.getProductos();
+        setProductos(p || []);
+      } catch {}
+    } catch (err) {
+      alert("No se pudo registrar la venta");
+      console.error(err);
+    }
   };
 
   const resetAll = () => {
-    setEmpresa(seedEmpresa);
-    setClientes(seedClientes);
-    setProductos(seedProductos);
-    setVentas(seedVentas);
+    // Sólo para demo: vuelve a cargar desde API (o seeds en caso de error)
+    cargarTodo();
   };
 
   return {
-    empresa, setEmpresa,
-    clientes, addCliente, updateCliente, deleteCliente,
-    productos, addProducto, updateProducto, deleteProducto,
-    ventas, registrarVenta, resetAll,
+    empresa,
+    setEmpresa: async (e) => {
+      try {
+        const upd = await api.putEmpresa(e);
+        setEmpresa(upd);
+      } catch (err) {
+        alert("No se pudo guardar la empresa");
+        console.error(err);
+      }
+    },
+
+    clientes,
+    addCliente,
+    updateCliente,
+    deleteCliente,
+
+    productos,
+    addProducto,
+    updateProducto,
+    deleteProducto,
+
+    ventas,
+    registrarVenta,
+
+    resetAll,
+    cargando,
+    error,
   };
 }
-function loadLS(k, fallback) {
-  try { const raw = localStorage.getItem(`ventas-sim:${k}`); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
-}
-function saveLS(k, v) {
-  try { localStorage.setItem(`ventas-sim:${k}`, JSON.stringify(v)); } catch {}
-}
 
-/* ========= componentes base ========= */
+/* ========= UI base ========= */
 function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
@@ -161,7 +249,7 @@ function Section({ title, right, children }) {
   );
 }
 
-/* ========= Productos (CRUD) ========= */
+/* ========= Productos ========= */
 function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
   const [q, setQ] = useState("");
   const [openAdd, setOpenAdd] = useState(false);
@@ -246,53 +334,26 @@ function ProductoForm({ initial, onSubmit }) {
             value={f.codigo}
             onChange={(e) => setF({ ...f, codigo: e.target.value })}
           />
-          <button
-            type="button"
-            className="btn-outline"
-            onClick={() => setScannerOpen(true)}
-          >
-            📷
-          </button>
+          <button type="button" className="btn-outline" onClick={() => setScannerOpen(true)}>📷</button>
         </div>
       </Field>
 
       <div className="grid sm:grid-cols-2 gap-3">
         <Field label="Stock">
-          <input
-            type="number"
-            className="input"
-            value={f.stock}
-            onChange={(e) => setF({ ...f, stock: e.target.value })}
-          />
+          <input type="number" className="input" value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })}/>
         </Field>
         <Field label="Precio">
-          <input
-            type="number"
-            step="0.01"
-            className="input"
-            value={f.precio}
-            onChange={(e) => setF({ ...f, precio: e.target.value })}
-          />
+          <input type="number" step="0.01" className="input" value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })}/>
         </Field>
       </div>
 
       <div className="flex justify-end">
-        <button type="submit" className="btn-primary">
-          Guardar
-        </button>
+        <button type="submit" className="btn-primary">Guardar</button>
       </div>
 
-      {/* Modal de escaneo */}
-      <Modal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        title="Escanear código de producto"
-      >
+      <Modal open={scannerOpen} onClose={() => setScannerOpen(false)} title="Escanear código de producto">
         <ScannerZXing
-          onResult={(code) => {
-            setF({ ...f, codigo: String(code) });
-            setScannerOpen(false);
-          }}
+          onResult={(code) => { setF({ ...f, codigo: String(code) }); setScannerOpen(false); }}
           onClose={() => setScannerOpen(false)}
         />
       </Modal>
@@ -300,7 +361,7 @@ function ProductoForm({ initial, onSubmit }) {
   );
 }
 
-/* ========= Clientes (CRUD) ========= */
+/* ========= Clientes ========= */
 function ClientesTab({ clientes, onAdd, onUpdate, onDelete }) {
   const [q, setQ] = useState("");
   const [openAdd, setOpenAdd] = useState(false);
@@ -368,7 +429,7 @@ function ClienteForm({ initial, onSubmit }) {
   );
 }
 
-/* ========= Vender (con ZXing) ========= */
+/* ========= Vender ========= */
 function VenderTab({ productos, clientes, onRegistrarVenta }) {
   const [productIdOrCode, setProductIdOrCode] = useState("");
   const [qty, setQty] = useState(1);
@@ -393,10 +454,22 @@ function VenderTab({ productos, clientes, onRegistrarVenta }) {
     });
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const val = productIdOrCode.trim();
     if (!val) return;
-    const p = /^\d+$/.test(val) ? (productosById[Number(val)] || productosByCode[val]) : productosByCode[val];
+
+    // Buscar por ID o por código:
+    let p = /^\d+$/.test(val) ? productosById[Number(val)] : null;
+    if (!p) {
+      try {
+        const byCode = await api.getProductoPorCodigo(val);
+        p = byCode || productosByCode[val];
+      } catch {
+        // si la API no tiene endpoint de código o falla, recurre al local
+        p = productosByCode[val];
+      }
+    }
+
     addToCart(p, qty);
     setProductIdOrCode("");
     setQty(1);
@@ -413,7 +486,7 @@ function VenderTab({ productos, clientes, onRegistrarVenta }) {
       fechaISO: todayISO(),
       items: cart.map((it) => ({ productId: it.productId, cantidad: it.cantidad, precio: it.precio })),
     };
-    onRegistrarVenta(venta);
+    await onRegistrarVenta(venta);
     await generarFacturaPDF({ venta, clientes, productosById });
     setCart([]);
   };
@@ -421,7 +494,6 @@ function VenderTab({ productos, clientes, onRegistrarVenta }) {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       <Section title="Nueva venta">
-        {/* input arriba */}
         <div className="space-y-2 mb-3">
           <input
             className="input w-full"
@@ -520,7 +592,7 @@ function VenderTab({ productos, clientes, onRegistrarVenta }) {
         <ScannerZXing
           onResult={(code) => {
             setProductIdOrCode(String(code));
-            // Si quieres agregar automáticamente al leer:
+            // Si deseas agregar automáticamente al leer:
             // setQty(1); handleAdd();
           }}
           onClose={() => setScannerOpen(false)}
@@ -554,7 +626,7 @@ function VentasTab({ ventas, clientes, productos }) {
               return (
                 <tr key={v.id} className="tr-hover border-t">
                   <td className="td">{v.id}</td>
-                  <td className="td">{new Date(v.fechaISO).toLocaleString()}</td>
+                  <td className="td">{new Date(v.fechaISO || v.fecha || new Date()).toLocaleString()}</td>
                   <td className="td">{c ? `${c.nombre} ${c.apellido}` : ""}</td>
                   <td className="td">{v.vendedor}</td>
                   <td className="td text-right">{money(v.total)}</td>
@@ -575,7 +647,7 @@ function EmpresaTab({ empresa, setEmpresa, onReset }) {
   const [form, setForm] = useState(empresa);
   useEffect(() => setForm(empresa), [empresa]);
   return (
-    <Section title="Empresa" right={<button className="btn-danger" onClick={onReset}>Restablecer datos</button>}>
+    <Section title="Empresa" right={<button className="btn-danger" onClick={onReset}>Recargar</button>}>
       <div className="grid gap-3 max-w-xl">
         <Field label="Nombre"><input className="input" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })}/></Field>
         <Field label="Ubicación"><input className="input" value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })}/></Field>
@@ -586,13 +658,16 @@ function EmpresaTab({ empresa, setEmpresa, onReset }) {
   );
 }
 
-/* ========= Factura ========= */
+/* ========= Factura (PDF) ========= */
 async function generarFacturaPDF({ venta, clientes, productosById }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const margen = 36;
   const ancho = 595 - margen * 2;
 
-  const empresa = JSON.parse(localStorage.getItem("ventas-sim:empresa") || "null") || seedEmpresa;
+  // Empresa se imprime con lo que haya actualmente en local (ya está en estado)
+  const empresaLS = JSON.parse(localStorage.getItem("ventas-sim:empresa") || "null");
+
+  const empresa = empresaLS || { nombre: "Empresa", ubicacion: "", telefono: "" };
 
   let y = margen;
   doc.setFontSize(16); doc.setFont(undefined, "bold");
@@ -605,7 +680,7 @@ async function generarFacturaPDF({ venta, clientes, productosById }) {
   doc.setFont(undefined, "bold"); doc.text("FACTURA", xRight, y, { align: "right" });
   doc.setFont(undefined, "normal");
   y += 14; doc.text(`No.: ${venta.id ?? ""}`, xRight, y, { align: "right" });
-  y += 14; doc.text(`Fecha: ${new Date(venta.fechaISO).toLocaleString()}`, xRight, y, { align: "right" });
+  y += 14; doc.text(`Fecha: ${new Date(venta.fechaISO || venta.fecha || new Date()).toLocaleString()}`, xRight, y, { align: "right" });
   y += 14; doc.text(`Vendedor: ${venta.vendedor}`, xRight, y, { align: "right" });
 
   y += 24; doc.setFont(undefined, "bold"); doc.text("Cliente", margen, y);
@@ -625,7 +700,7 @@ async function generarFacturaPDF({ venta, clientes, productosById }) {
   printRow(["Producto", "Precio", "Cant.", "Subtotal"]);
   y -= 8; doc.setLineWidth(0.2); doc.line(margen, y, margen + ancho, y); y += 14;
 
-  venta.items.forEach((it) => {
+  (venta.items || []).forEach((it) => {
     const p = productosById[it.productId];
     printRow([p?.nombre || `#${it.productId}`, money(it.precio), it.cantidad, money(it.cantidad * it.precio)]);
   });
@@ -640,7 +715,7 @@ async function generarFacturaPDF({ venta, clientes, productosById }) {
   doc.save(`factura_${venta.id ?? "venta"}.pdf`);
 }
 
-/* ========= App principal ========= */
+/* ========= App ========= */
 export default function App() {
   const store = useStore();
   const [tab, setTab] = useState("vender");
@@ -649,6 +724,15 @@ export default function App() {
     <div className="min-h-screen">
       <TopBar tab={tab} onTab={setTab} />
       <div className="container-app space-y-6 py-6">
+        {store.cargando && (
+          <div className="card card-body">Cargando datos…</div>
+        )}
+        {!store.cargando && store.error && (
+          <div className="card card-body text-amber-700 bg-amber-50 border-amber-200">
+            {store.error}
+          </div>
+        )}
+
         {tab === "productos" && (
           <ProductosTab
             productos={store.productos}

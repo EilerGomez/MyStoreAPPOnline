@@ -22,8 +22,8 @@ const seedClientes = [
   { id: 2, cedula: "1234567-8", nombre: "Ana", apellido: "Pérez", telefono: "5555-0001", direccion: "Zona 1" },
 ];
 const seedProductos = [
-  { id: 1, nombre: "Lector de codigo de barras", codigo: "810098151139", stock: 100, precio: 4.5 },
-  { id: 2, nombre: "Libro muchos cuerpos una misma alma", codigo: "9788496546080", stock: 60, precio: 18.0 },
+  { id: 1, nombre: "Lector de codigo de barras", codigo: "810098151139", stock: 100, precio: 200 },
+  { id: 2, nombre: "Libro muchos cuerpos una misma alma", codigo: "9788496546080", stock: 60, precio: 150 },
 ];
 const seedVentas = [
   {
@@ -219,15 +219,83 @@ function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
 }
 function ProductoForm({ initial, onSubmit }) {
   const [f, setF] = useState(initial || { nombre: "", codigo: "", stock: 0, precio: 0 });
+  const [scannerOpen, setScannerOpen] = useState(false);
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...f, stock: Number(f.stock), precio: Number(f.precio) }); }} className="grid gap-3">
-      <Field label="Nombre"><input className="input" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} required/></Field>
-      <Field label="Código"><input className="input" value={f.codigo} onChange={(e) => setF({ ...f, codigo: e.target.value })}/></Field>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({ ...f, stock: Number(f.stock), precio: Number(f.precio) });
+      }}
+      className="grid gap-3"
+    >
+      <Field label="Nombre">
+        <input
+          className="input"
+          value={f.nombre}
+          onChange={(e) => setF({ ...f, nombre: e.target.value })}
+          required
+        />
+      </Field>
+
+      <Field label="Código de barras / QR">
+        <div className="flex gap-2">
+          <input
+            className="input flex-1"
+            placeholder="Escanea o escribe el código..."
+            value={f.codigo}
+            onChange={(e) => setF({ ...f, codigo: e.target.value })}
+          />
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => setScannerOpen(true)}
+          >
+            📷
+          </button>
+        </div>
+      </Field>
+
       <div className="grid sm:grid-cols-2 gap-3">
-        <Field label="Stock"><input type="number" className="input" value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })}/></Field>
-        <Field label="Precio"><input type="number" step="0.01" className="input" value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })}/></Field>
+        <Field label="Stock">
+          <input
+            type="number"
+            className="input"
+            value={f.stock}
+            onChange={(e) => setF({ ...f, stock: e.target.value })}
+          />
+        </Field>
+        <Field label="Precio">
+          <input
+            type="number"
+            step="0.01"
+            className="input"
+            value={f.precio}
+            onChange={(e) => setF({ ...f, precio: e.target.value })}
+          />
+        </Field>
       </div>
-      <div className="flex justify-end"><button type="submit" className="btn-primary">Guardar</button></div>
+
+      <div className="flex justify-end">
+        <button type="submit" className="btn-primary">
+          Guardar
+        </button>
+      </div>
+
+      {/* Modal de escaneo */}
+      <Modal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        title="Escanear código de producto"
+      >
+        <ScannerZXing
+          onResult={(code) => {
+            setF({ ...f, codigo: String(code) });
+            setScannerOpen(false);
+          }}
+          onClose={() => setScannerOpen(false)}
+        />
+      </Modal>
     </form>
   );
 }

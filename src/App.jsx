@@ -238,7 +238,7 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white w/full max-w-2xl rounded-xl shadow-xl">
+      <div className="bg-white w-full max-w-2xl rounded-xl shadow-xl">
         <div className="flex items-center justify-between border-b px-5 py-3">
           <h3 className="font-semibold">{title}</h3>
           <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800">✕</button>
@@ -795,7 +795,7 @@ const toGTDateKey = (d) => {
 
 
 /* ======================= Ventas ======================= */
-function VentasTab({ ventas, clientes, productos }) {
+function VentasTab({ ventas, clientes, productos,empresa  }) {
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [detalleVenta, setDetalleVenta] = useState(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
@@ -860,7 +860,7 @@ function VentasTab({ ventas, clientes, productos }) {
   const generarFactura = async (ventaId) => {
     try {
       const v = await api.getVentaById(ventaId);
-      await generarFacturaPDF({ venta: v });
+      await generarFacturaPDF({ venta: v,empresa });
     } catch {
       alert("No se pudo generar la factura.");
     }
@@ -1236,6 +1236,7 @@ export default function App() {
             ventas={store.ventas}
             clientes={store.clientes}
             productos={store.productos}
+            empresa={store.empresa}
           />
         )}
         {tab === "empresa" && (

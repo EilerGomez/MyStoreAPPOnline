@@ -22,16 +22,50 @@ const seedClientes = [
   { id: 2, cedula: "1234567-8", nombre: "Ana", apellido: "Pérez", telefono: "5555-0001", direccion: "Zona 1" },
 ];
 const seedProductos = [
-  { id: 1, nombre: "Lapicero azul", codigo: "750123450001", stock: 100, precio: 4.5 },
-  { id: 2, nombre: "Cuaderno A5", codigo: "750123450002", stock: 60, precio: 18.0 },
+  { id: 1, nombre: "Lector de codigo de barras", codigo: "810098151139", stock: 100, precio: 4.5 },
+  { id: 2, nombre: "Libro muchos cuerpos una misma alma", codigo: "9788496546080", stock: 60, precio: 18.0 },
 ];
+const seedVentas = [
+  {
+    id: 1,
+    clienteId: 1, // C/F
+    vendedor: "Kenny",
+    fechaISO: "2025-10-10T09:32:00Z",
+    total: 63.0,
+    items: [
+      { productId: 1, cantidad: 3, precio: 4.5 },
+      { productId: 2, cantidad: 3, precio: 18.0 },
+    ],
+  },
+  {
+    id: 2,
+    clienteId: 2, // Ana Pérez
+    vendedor: "Mario",
+    fechaISO: "2025-10-11T15:45:00Z",
+    total: 22.5,
+    items: [
+      { productId: 1, cantidad: 5, precio: 4.5 },
+    ],
+  },
+  {
+    id: 3,
+    clienteId: 2,
+    vendedor: "Eiler",
+    fechaISO: "2025-10-12T11:15:00Z",
+    total: 36.0,
+    items: [
+      { productId: 2, cantidad: 2, precio: 18.0 },
+    ],
+  },
+];
+
 
 /* ========= almacenamiento local ========= */
 function useStore() {
   const [empresa, setEmpresa] = useState(() => loadLS("empresa", seedEmpresa));
   const [clientes, setClientes] = useState(() => loadLS("clientes", seedClientes));
   const [productos, setProductos] = useState(() => loadLS("productos", seedProductos));
-  const [ventas, setVentas] = useState(() => loadLS("ventas", []));
+  const [ventas, setVentas] = useState(() => loadLS("ventas", seedVentas));
 
   useEffect(() => saveLS("empresa", empresa), [empresa]);
   useEffect(() => saveLS("clientes", clientes), [clientes]);

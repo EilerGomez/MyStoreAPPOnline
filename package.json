@@ -1,5 +1,5 @@
 {
-  "name": "ventas-sim",
+  "name": "MyStore",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --port 4173"
   },
   "dependencies": {
     "html5-qrcode": "^2.3.8",
@@ -30,5 +30,7 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
     "vite": "^7.1.7"
+  }, "engines": {
+    "node": "^20.19.0"
   }
 }

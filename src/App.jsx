@@ -59,8 +59,23 @@ const seedVentas = [
   },
 ];
 
+const STORAGE_PREFIX = 'ventas-sim';
+const STORAGE_VERSION = 'v2'; // súbelo cuando cambies seeds
 
+function ensureSeedsVersion() {
+  const metaKey = `${STORAGE_PREFIX}:meta`;
+  const meta = JSON.parse(localStorage.getItem(metaKey) || 'null');
+
+  if (!meta || meta.version !== STORAGE_VERSION) {
+    localStorage.setItem(`${STORAGE_PREFIX}:empresa`, JSON.stringify(seedEmpresa));
+    localStorage.setItem(`${STORAGE_PREFIX}:clientes`, JSON.stringify(seedClientes));
+    localStorage.setItem(`${STORAGE_PREFIX}:productos`, JSON.stringify(seedProductos));
+    localStorage.setItem(`${STORAGE_PREFIX}:ventas`,   JSON.stringify(seedVentas));
+    localStorage.setItem(metaKey, JSON.stringify({ version: STORAGE_VERSION, seededAt: new Date().toISOString() }));
+  }
+}
 /* ========= almacenamiento local ========= */
+ensureSeedsVersion();
 function useStore() {
   const [empresa, setEmpresa] = useState(() => loadLS("empresa", seedEmpresa));
   const [clientes, setClientes] = useState(() => loadLS("clientes", seedClientes));
@@ -94,7 +109,7 @@ function useStore() {
     setEmpresa(seedEmpresa);
     setClientes(seedClientes);
     setProductos(seedProductos);
-    setVentas([]);
+    setVentas(seedVentas);
   };
 
   return {

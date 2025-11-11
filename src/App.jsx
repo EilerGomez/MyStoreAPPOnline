@@ -117,7 +117,8 @@ function Login({ onOk }) {
           </div>
         )}
 
-        <form onSubmit={submit} className="grid gap-3">
+        {/* Permite Enter con el guard global */}
+        <form onSubmit={submit} className="grid gap-3" data-allow-enter="add">
           <label className="text-sm">
             <span className="block text-slate-600 mb-1">Usuario</span>
             <input
@@ -142,8 +143,6 @@ function Login({ onOk }) {
         </form>
 
         <div className="mt-4 text-xs text-slate-500">
-          <div><strong>admin</strong> / 123456</div>
-          <div><strong>cajero</strong> / cajero123</div>
         </div>
       </div>
     </div>
@@ -339,6 +338,7 @@ function Section({ title, right, children }) {
 /* ======================= Productos ======================= */
 function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
   const [q, setQ] = useState("");
+  the
   const [openAdd, setOpenAdd] = useState(false);
   const [edit, setEdit] = useState(null);
 
@@ -1247,9 +1247,9 @@ async function generarFacturaPDF({ venta, empresa }) {
 /* ======================= App ======================= */
 export default function App() {
   /* --- BLOQUEO POR LOGIN (AGREGADO) --- */
-  const [authed, setAuthed] = useState(false);
-  if (!authed) {
-    return <Login onOk={() => setAuthed(true)} />;
+  const [user, setUser] = useState(null);
+  if (!user) {
+    return <Login onOk={(u) => setUser(u)} />;
   }
   /* --- FIN BLOQUEO LOGIN --- */
 

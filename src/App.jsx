@@ -83,6 +83,74 @@ const money = (n) =>
   new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(Number(n || 0));
 const todayISO = () => new Date().toISOString();
 
+/* ======================= LOGIN EN MEMORIA (AGREGADO) ======================= */
+const USERS = [
+  { username: "admin",  password: "123456" },
+  { username: "cajero", password: "cajero123" },
+];
+
+function Login({ onOk }) {
+  const [u, setU] = useState("");
+  const [p, setP] = useState("");
+  const [msg, setMsg] = useState("");
+
+  const submit = (e) => {
+    e.preventDefault();
+    const ok = USERS.some((x) => x.username === u && x.password === p);
+    if (ok) {
+      setMsg("");
+      onOk({ username: u });
+    } else {
+      setMsg("Usuario o contraseña incorrectos.");
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+      <div className="bg-white w-full max-w-sm rounded-xl shadow-lg p-6">
+        <h1 className="text-xl font-semibold mb-1">Iniciar sesión</h1>
+        <p className="text-sm text-slate-600 mb-4">Ingresa tus credenciales</p>
+
+        {msg && (
+          <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+            {msg}
+          </div>
+        )}
+
+        <form onSubmit={submit} className="grid gap-3">
+          <label className="text-sm">
+            <span className="block text-slate-600 mb-1">Usuario</span>
+            <input
+              className="input w-full"
+              value={u}
+              onChange={(e) => setU(e.target.value)}
+              autoFocus
+              required
+            />
+          </label>
+          <label className="text-sm">
+            <span className="block text-slate-600 mb-1">Contraseña</span>
+            <input
+              className="input w-full"
+              type="password"
+              value={p}
+              onChange={(e) => setP(e.target.value)}
+              required
+            />
+          </label>
+          <button type="submit" className="btn-primary mt-2">Entrar</button>
+        </form>
+
+        <div className="mt-4 text-xs text-slate-500">
+          <div><strong>admin</strong> / 123456</div>
+          <div><strong>cajero</strong> / cajero123</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+/* ======================= FIN LOGIN ======================= */
+
 /* ======================= store con API (sin localStorage) ======================= */
 function useStore() {
   const [empresa, setEmpresa] = useState({ id: 1, nombre: "", ubicacion: "", telefono: "" });
@@ -1178,6 +1246,13 @@ async function generarFacturaPDF({ venta, empresa }) {
 
 /* ======================= App ======================= */
 export default function App() {
+  /* --- BLOQUEO POR LOGIN (AGREGADO) --- */
+  const [authed, setAuthed] = useState(false);
+  if (!authed) {
+    return <Login onOk={() => setAuthed(true)} />;
+  }
+  /* --- FIN BLOQUEO LOGIN --- */
+
   const [tab, setTab] = useState("vender");
   const store = useStore();
 

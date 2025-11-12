@@ -336,6 +336,7 @@ function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
   const [q, setQ] = useState("");
   const [openAdd, setOpenAdd] = useState(false);
   const [edit, setEdit] = useState(null);
+  const [view, setView] = useState(null);
 
   const filtered = useMemo(
     () =>
@@ -349,6 +350,18 @@ function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
     [q, productos]
   );
 
+  const ImgThumb = ({ src, alt }) =>
+    src ? (
+      <img
+        src={src}
+        alt={alt || "img"}
+        className="h-10 w-10 rounded-md object-cover border"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+    ) : (
+      <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-400 text-xs border">—</span>
+    );
+
   return (
     <Section title="Productos" right={<button type="button" className="btn-primary" onClick={() => setOpenAdd(true)}>+ Nuevo</button>}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
@@ -360,6 +373,7 @@ function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
           <thead className="thead">
             <tr>
               <th className="th">ID</th>
+              <th className="th">Img</th>
               <th className="th">Nombre</th>
               <th className="th">Código</th>
               <th className="th text-right">Stock</th>
@@ -371,18 +385,20 @@ function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
             {filtered.map((p) => (
               <tr key={p.id} className="tr-hover border-t">
                 <td className="td">{p.id}</td>
+                <td className="td"><ImgThumb src={p.url_img} alt={p.nombre} /></td>
                 <td className="td">{p.nombre}</td>
                 <td className="td">{p.codigo}</td>
                 <td className="td text-right">{p.stock}</td>
                 <td className="td text-right">{money(p.precio)}</td>
                 <td className="td flex gap-2">
+                  <button type="button" className="btn-outline" onClick={() => setView(p)}>Ver</button>
                   <button type="button" className="btn-outline" onClick={() => setEdit(p)}>Editar</button>
                   <button type="button" className="btn-danger" onClick={() => onDelete(p.id)}>Eliminar</button>
                 </td>
               </tr>
             ))}
             {!filtered.length && (
-              <tr><td className="td text-center muted py-8" colSpan={6}>Sin productos</td></tr>
+              <tr><td className="td text-center muted py-8" colSpan={7}>Sin productos</td></tr>
             )}
           </tbody>
         </table>
@@ -391,14 +407,51 @@ function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
       <Modal open={openAdd} onClose={() => setOpenAdd(false)} title="Nuevo producto">
         <ProductoForm onSubmit={(v) => { onAdd(v); setOpenAdd(false); }} />
       </Modal>
+
       <Modal open={!!edit} onClose={() => setEdit(null)} title="Editar producto">
         {edit && <ProductoForm initial={edit} onSubmit={(v) => { onUpdate({ ...edit, ...v }); setEdit(null); }} />}
+      </Modal>
+
+      <Modal open={!!view} onClose={() => setView(null)} title="Detalle de producto">
+        {view && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-sm text-slate-600">Nombre</div>
+              <div className="font-medium">{view.nombre}</div>
+
+              <div className="text-sm text-slate-600 mt-3">Código</div>
+              <div>{view.codigo || "—"}</div>
+
+              <div className="text-sm text-slate-600 mt-3">Stock</div>
+              <div>{view.stock}</div>
+
+              <div className="text-sm text-slate-600 mt-3">Precio</div>
+              <div>{money(view.precio)}</div>
+
+              <div className="text-sm text-slate-600 mt-3">URL imagen</div>
+              <div className="break-all text-slate-700 text-sm">{view.url_img || "—"}</div>
+            </div>
+            <div className="flex items-start justify-center">
+              {view.url_img ? (
+                <img
+                  src={view.url_img}
+                  alt={view.nombre}
+                  className="max-h-72 w-auto rounded-lg border object-contain"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <div className="w-full h-48 border rounded-lg flex items-center justify-center text-slate-400 bg-slate-50">Sin imagen</div>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </Section>
   );
 }
+
 function ProductoForm({ initial, onSubmit }) {
-  const [f, setF] = useState(initial || { nombre: "", codigo: "", stock: 0, precio: 0 });
+  const [f, setF] = useState(initial || { nombre: "", codigo: "", stock: 0, precio: 0, url_img: "" });
   const [scannerOpen, setScannerOpen] = useState(false);
 
   return (
@@ -410,17 +463,46 @@ function ProductoForm({ initial, onSubmit }) {
       <Field label="Nombre">
         <input className="input" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} required />
       </Field>
+
       <Field label="Código de barras / QR">
         <div className="flex gap-2">
           <input className="input flex-1" placeholder="Escanea o escribe el código..." value={f.codigo} onChange={(e) => setF({ ...f, codigo: e.target.value })}/>
           <button type="button" className="btn-outline" onClick={() => setScannerOpen(true)}>📷</button>
         </div>
       </Field>
+
       <div className="grid sm:grid-cols-2 gap-3">
         <Field label="Stock"><input type="number" className="input" value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })}/></Field>
         <Field label="Precio"><input type="number" step="0.01" className="input" value={f.precio} onChange={(e) => setF({ ...f, precio: e.target.value })}/></Field>
       </div>
-      <div className="flex justify-end"><button type="submit" className="btn-primary">Guardar</button></div>
+
+      <Field label="URL de imagen (opcional)">
+        <input
+          className="input"
+          placeholder="https://…"
+          value={f.url_img || ""}
+          onChange={(e) => setF({ ...f, url_img: e.target.value })}
+        />
+      </Field>
+
+      {/* Preview */}
+      {f.url_img ? (
+        <div className="flex items-center gap-3">
+          <img
+            src={f.url_img}
+            alt="preview"
+            className="h-24 w-24 rounded-lg object-cover border"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+          <div className="text-xs text-slate-500 break-all">{f.url_img}</div>
+        </div>
+      ) : (
+        <div className="text-xs text-slate-400">Puedes pegar un enlace público a la imagen del producto.</div>
+      )}
+
+      <div className="flex justify-end mt-1">
+        <button type="submit" className="btn-primary">Guardar</button>
+      </div>
 
       <Modal open={scannerOpen} onClose={() => setScannerOpen(false)} title="Escanear código de producto">
         <ScannerZXing

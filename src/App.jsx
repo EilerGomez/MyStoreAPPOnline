@@ -438,8 +438,7 @@ function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
               <div className="text-sm text-slate-600 mt-3">Precio</div>
               <div>{money(view.precio)}</div>
 
-              <div className="text-sm text-slate-600 mt-3">URL imagen</div>
-              <div className="break-all text-slate-700 text-sm">{view.url_img || "—"}</div>
+              <div className="text-sm text-slate-600 mt-3"> Imagen</div>
             </div>
             <div className="flex items-start justify-center">
               {view.url_img ? (

@@ -83,7 +83,7 @@ const money = (n) =>
   new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ" }).format(Number(n || 0));
 const todayISO = () => new Date().toISOString();
 
-/* ======================= LOGIN EN MEMORIA (AGREGADO) ======================= */
+/* ======================= LOGIN EN MEMORIA ======================= */
 const USERS = [
   { username: "admin",  password: "123456" },
   { username: "cajero", password: "cajero123" },
@@ -143,6 +143,8 @@ function Login({ onOk }) {
         </form>
 
         <div className="mt-4 text-xs text-slate-500">
+          <div><strong>admin</strong> / 123456</div>
+          <div><strong>cajero</strong> / cajero123</div>
         </div>
       </div>
     </div>
@@ -170,7 +172,6 @@ function useStore() {
         api.getVentas(),
       ]);
 
-      // Normaliza empresa (mapear null -> "")
       const eNorm = e && typeof e === "object"
         ? {
             id: e.id ?? 1,
@@ -236,7 +237,6 @@ function useStore() {
 
   // ============ Ventas ============
   const registrarVenta = async (venta) => {
-    // Enviar exactamente: { clienteId, vendedor, fechaISO, items }
     const payload = {
       clienteId: Number(venta.clienteId),
       vendedor: String(venta.vendedor || ""),
@@ -248,18 +248,14 @@ function useStore() {
       })),
     };
 
-    // POST: devuelve { id, total, fecha }
     const creado = await api.postVenta(payload);
-
-    // GET por id para obtener items y datos finales (con nombre y precio definitivos + cliente)
     const ventaCompleta = await api.getVentaById(creado.id);
 
-    // refrescar ventas y productos (stock)
     const [v, p] = await Promise.all([api.getVentas(), api.getProductos()]);
     setVentas(Array.isArray(v) ? v : []);
     setProductos(Array.isArray(p) ? p : []);
 
-    return ventaCompleta; // devolver a la UI para facturar luego
+    return ventaCompleta;
   };
 
   // ============ Empresa ============
@@ -278,7 +274,7 @@ function useStore() {
       : { id: 1, nombre: "", ubicacion: "", telefono: "" };
 
     setEmpresa(eNorm);
-    return true; // para que la UI muestre el banner
+    return true;
   };
 
   return {
@@ -338,7 +334,6 @@ function Section({ title, right, children }) {
 /* ======================= Productos ======================= */
 function ProductosTab({ productos, onAdd, onUpdate, onDelete }) {
   const [q, setQ] = useState("");
-  the
   const [openAdd, setOpenAdd] = useState(false);
   const [edit, setEdit] = useState(null);
 
@@ -817,16 +812,14 @@ function VenderTab({ productos, clientes, empresa, onRegistrarVenta }) {
 const formatFechaLocal = (fechaStr) => {
   if (!fechaStr) return "";
 
-  // Si viene en formato ISO sin hora útil
   if (/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(fechaStr)) {
     const [y, m, d] = fechaStr.split("T")[0].split("-");
-    return `${d}/${m}/${y}`; // Ej: 14/10/2025
+    return `${d}/${m}/${y}`;
   }
 
   const fecha = new Date(fechaStr);
   if (isNaN(fecha)) return String(fechaStr);
 
-  // Formato completo con hora local
   return fecha.toLocaleString("es-GT", {
     timeZone: "America/Guatemala",
     year: "numeric",
@@ -837,53 +830,41 @@ const formatFechaLocal = (fechaStr) => {
   });
 };
 
-// Clave YYYY-MM-DD en zona GT (ideal para comparar y filtrar rango/hoy)
-// Clave de fecha en zona America/Guatemala (YYYY-MM-DD)
 const toGTDateKey = (d) => {
   if (!d) return "";
-
-  // Si viene exactamente como "YYYY-MM-DDT00:00:00.000Z", usa la parte de fecha tal cual.
   if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(d)) {
-    return d.slice(0, 10); // "YYYY-MM-DD"
+    return d.slice(0, 10);
   }
-
   const date = new Date(d);
   if (isNaN(date)) return String(d);
-
-  // Formatear a zona America/Guatemala y aaaaa-mm-dd
   const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Guatemala",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-
-  return fmt.format(date); // "YYYY-MM-DD"
+  return fmt.format(date);
 };
 
-
 /* ======================= Ventas ======================= */
-function VentasTab({ ventas, clientes, productos,empresa  }) {
+function VentasTab({ ventas, clientes, productos, empresa }) {
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [detalleVenta, setDetalleVenta] = useState(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
 
-  // Buscador + Filtros (Hoy / Todas / Rango)
   const [q, setQ] = useState("");
-  const [modo, setModo] = useState("todas"); // 'todas' | 'hoy' | 'rango'
+  const [modo, setModo] = useState("todas");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
 
   const ventasFiltradas = useMemo(() => {
     let arr = Array.isArray(ventas) ? ventas.slice() : [];
-
-    // Filtro por modo de fecha (en zona GT)
     if (modo === "hoy") {
       const hoyKey = toGTDateKey(new Date());
       arr = arr.filter((v) => toGTDateKey(v.fecha || v.fechaISO || new Date()) === hoyKey);
     } else if (modo === "rango" && (desde || hasta)) {
-      const d1 = desde ? desde : null; // YYYY-MM-DD
-      const d2 = hasta ? hasta : null; // YYYY-MM-DD
+      const d1 = desde ? desde : null;
+      const d2 = hasta ? hasta : null;
       arr = arr.filter((v) => {
         const key = toGTDateKey(v.fecha || v.fechaISO || new Date());
         if (d1 && key < d1) return false;
@@ -891,8 +872,6 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
         return true;
       });
     }
-
-    // Buscador
     const QQ = q.trim().toLowerCase();
     if (QQ) {
       arr = arr.filter((v) => {
@@ -911,7 +890,6 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
     return arr;
   }, [ventas, clientes, q, modo, desde, hasta]);
 
-  /* ============ DETALLE ============ */
   const abrirDetalle = async (ventaId) => {
     setDetalleLoading(true);
     try {
@@ -928,13 +906,12 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
   const generarFactura = async (ventaId) => {
     try {
       const v = await api.getVentaById(ventaId);
-      await generarFacturaPDF({ venta: v,empresa });
+      await generarFacturaPDF({ venta: v, empresa });
     } catch {
       alert("No se pudo generar la factura.");
     }
   };
 
-  /* ============ EXPORTAR PDF ============ */
   const exportarPDF = () => {
     if (!ventasFiltradas.length) return alert("No hay datos para exportar.");
     const doc = new jsPDF({ orientation: "landscape" });
@@ -959,7 +936,6 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
     doc.save(`reporte_ventas_${toGTDateKey(new Date())}.pdf`);
   };
 
-  /* ============ EXPORTAR EXCEL ============ */
   const exportarExcel = () => {
     if (!ventasFiltradas.length) return alert("No hay datos para exportar.");
     const datos = ventasFiltradas.map((v) => {
@@ -984,7 +960,6 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
       title="Ventas"
       right={
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          {/* Buscador */}
           <div className="w-full sm:w-64">
             <input
               className="input w-full"
@@ -993,8 +968,6 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-
-          {/* Modo de filtro (Combobox) */}
           <div>
             <div className="text-xs text-slate-600 mb-1">Filtrar por</div>
             <select
@@ -1007,43 +980,24 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
               <option value="rango">Rango</option>
             </select>
           </div>
-
-          {/* Rango de fechas, solo cuando modo === "rango" */}
           {modo === "rango" && (
             <div className="flex items-end gap-2">
               <div>
                 <div className="text-xs text-slate-600 mb-1">Desde</div>
-                <input
-                  type="date"
-                  className="input"
-                  value={desde}
-                  onChange={(e) => setDesde(e.target.value)}
-                />
+                <input type="date" className="input" value={desde} onChange={(e) => setDesde(e.target.value)} />
               </div>
               <div>
                 <div className="text-xs text-slate-600 mb-1">Hasta</div>
-                <input
-                  type="date"
-                  className="input"
-                  value={hasta}
-                  onChange={(e) => setHasta(e.target.value)}
-                />
+                <input type="date" className="input" value={hasta} onChange={(e) => setHasta(e.target.value)} />
               </div>
             </div>
           )}
-
-          {/* Exportar */}
           <div className="flex gap-2">
-            <button type="button" className="btn-outline" onClick={exportarPDF}>
-              PDF
-            </button>
-            <button type="button" className="btn-outline" onClick={exportarExcel}>
-              Excel
-            </button>
+            <button type="button" className="btn-outline" onClick={exportarPDF}>PDF</button>
+            <button type="button" className="btn-outline" onClick={exportarExcel}>Excel</button>
           </div>
         </div>
       }
-
     >
       <div className="table-wrap">
         <table className="table">
@@ -1101,12 +1055,8 @@ function VentasTab({ ventas, clientes, productos,empresa  }) {
                     ? `${detalleVenta.cliente.nombre} ${detalleVenta.cliente.apellido} — NIT: ${detalleVenta.cliente.cedula}`
                     : `#${detalleVenta.clienteId}`}
                 </div>
-                {detalleVenta.cliente?.direccion && (
-                  <div className="muted">Dirección: {detalleVenta.cliente.direccion}</div>
-                )}
-                {detalleVenta.cliente?.telefono && (
-                  <div className="muted">Tel: {detalleVenta.cliente.telefono}</div>
-                )}
+                {detalleVenta.cliente?.direccion && <div className="muted">Dirección: {detalleVenta.cliente.direccion}</div>}
+                {detalleVenta.cliente?.telefono && <div className="muted">Tel: {detalleVenta.cliente.telefono}</div>}
               </div>
             </div>
 
@@ -1206,7 +1156,6 @@ async function generarFacturaPDF({ venta, empresa }) {
   y += 14; doc.text(`Fecha: ${formatFechaLocal(venta.fechaISO || venta.fecha || new Date())}`, xRight, y, { align: "right" });
   y += 14; doc.text(`Vendedor: ${venta.vendedor}`, xRight, y, { align: "right" });
 
-  // Cliente (prioriza venta.cliente)
   y += 24; doc.setFont(undefined, "bold"); doc.text("Cliente", margen, y);
   doc.setFont(undefined, "normal");
   const c = venta.cliente || null;
@@ -1217,7 +1166,6 @@ async function generarFacturaPDF({ venta, empresa }) {
   y += 14; doc.text(`Cédula/NIT: ${cedulaCli}`, margen, y);
   y += 14; doc.text(`Dirección: ${dirCli}`, margen, y);
 
-  // Detalle
   y += 24; doc.setFont(undefined, "bold"); doc.text("Detalle", margen, y);
   y += 10; doc.setLineWidth(0.5); doc.line(margen, y, margen + ancho, y);
   y += 14; doc.setFont(undefined, "normal");
@@ -1244,19 +1192,11 @@ async function generarFacturaPDF({ venta, empresa }) {
   doc.save(`factura_${venta.id ?? "venta"}.pdf`);
 }
 
-/* ======================= App ======================= */
-export default function App() {
-  /* --- BLOQUEO POR LOGIN (AGREGADO) --- */
-  const [user, setUser] = useState(null);
-  if (!user) {
-    return <Login onOk={(u) => setUser(u)} />;
-  }
-  /* --- FIN BLOQUEO LOGIN --- */
-
+/* ======================= App (envuelve con Login seguro para hooks) ======================= */
+function AppInner() {
   const [tab, setTab] = useState("vender");
   const store = useStore();
 
-  // Guard global: bloquea Enter en todo, salvo donde se permita expresamente
   useEffect(() => {
     const handler = (e) => {
       if (e.key !== 'Enter') return;
@@ -1267,7 +1207,7 @@ export default function App() {
         e.stopPropagation();
       }
     };
-    window.addEventListener('keydown', handler, true); // capture
+    window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
   }, []);
 
@@ -1324,6 +1264,11 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  return user ? <AppInner /> : <Login onOk={(u) => setUser(u)} />;
 }
 
 function TopBar({ tab, onTab }) {

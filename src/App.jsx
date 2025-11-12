@@ -301,16 +301,26 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-2xl rounded-xl shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-3">
+      <div className="bg-white w-full max-w-2xl rounded-xl shadow-xl flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-5 py-3 flex-shrink-0">
           <h3 className="font-semibold">{title}</h3>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800">✕</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-800 text-lg leading-none"
+          >
+            ✕
+          </button>
         </div>
-        <div className="p-5">{children}</div>
+
+        {/* Body con scroll si es largo */}
+        <div className="p-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );
 }
+
 function Field({ label, children }) {
   return (
     <label className="block text-sm">
